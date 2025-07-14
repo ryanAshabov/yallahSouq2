@@ -49,10 +49,6 @@ export default function LoginPage() {
       
       // Check if we're using mock data and this is a mock user
       if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && user.id?.startsWith('mock-user-')) {
-        logger.info('Mock user detected, redirecting without profile check', null, 'LoginPage');
-        // Use router.replace for safer navigation in WebContainer
-        router.replace(redirectTo);
-      } else {
         // For real users, get profile from Supabase
         try {
           const { data: profile } = await supabase
