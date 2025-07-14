@@ -38,12 +38,28 @@ export default function LoginPage() {
   // Handle successful login
   const handleLoginSuccess = async (user: any) => {
     try {
-      // Get user profile to determine redirect path
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      let profile;
+      
+      // Check if we're using mock data and this is a mock user
+      if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && user.id?.startsWith('mock-user-')) {
+        // Create mock profile instead of querying Supabase
+        profile = {
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || 'Mock User',
+          is_business_verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      } else {
+        // Get user profile from Supabase for real users
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        profile = data;
+      }
 
       if (profile) {
         // Redirect based on user type or preferences
