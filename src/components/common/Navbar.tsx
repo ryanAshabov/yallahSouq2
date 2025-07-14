@@ -170,10 +170,17 @@ export const Navbar: React.FC = () => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      // Mock logout
-      setUser(null);
+      // Call Supabase auth signOut
+      await supabase.auth.signOut();
+      
+      // Close profile menu
       setIsProfileMenuOpen(false);
+      
+      // Redirect to home page
       router.push('/');
+      
+      // Log the logout action
+      console.log('User logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -335,7 +342,7 @@ export const Navbar: React.FC = () => {
                         <div className="border-t border-gray-100 mt-2 pt-2">
                           <button
                             onClick={handleLogout}
-                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                           >
                             <span className="ml-2">🚪</span>
                             تسجيل الخروج

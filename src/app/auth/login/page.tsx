@@ -1,35 +1,45 @@
-'use client';
-
 /**
- * Login Page - Yalla Souq Palestinian
- * Main login page with routing and state management
+ * Login Page - Yalla Souq Palestinian Marketplace
+ * 
+ * This page component handles the login page routing, authentication checks,
+ * and redirects after successful login. It uses the Login component for the UI.
  */
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Login from '@/components/auth/Login';
-import { supabase } from '@/lib/supabase'; 
+import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 
 export default function LoginPage() {
+  // Hooks for navigation and query parameters
   const router = useRouter();
   const searchParams = useSearchParams();
+  
+  // Loading state for initial auth check
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check if user is already logged in
+  /**
+   * Check if user is already logged in
+   * If logged in, redirect to dashboard
+   */
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check for existing session
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
           // User is already logged in, redirect to dashboard
+          logger.info('User already logged in, redirecting to dashboard', null, 'LoginPage');
           router.push('/dashboard');
           return;
         }
       } catch (error) {
-        console.error('Auth check error:', error);
+        logger.error('Auth check error', error, 'LoginPage');
       } finally {
+        // Set loading to false regardless of outcome
         setIsLoading(false);
       }
     };
@@ -37,53 +47,38 @@ export default function LoginPage() {
     checkAuth();
   }, [router]);
 
-  // Handle successful login
-  const handleLoginSuccess = async (user: any) => {
+  /**
+   * Handle successful login
+   * Redirects user to appropriate page after login
+   */
+  const handleLoginSuccess = (user: any) => {
     try {
-      // Get redirect URL from query params or use default (relative path only)
+      // Get redirect URL from query params or use default
       const redirectPath = searchParams.get('redirect') || '/dashboard';
-      logger.info('Login success, redirecting to', { redirectPath }, 'LoginPage');
       
-      // In WebContainer, we need to use relative paths for navigation
-      const redirectTo = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`;
+      logger.info('Login successful, redirecting user', { redirectPath }, 'LoginPage');
       
-      // Check if we're using mock data and this is a mock user
-      if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && user.id?.startsWith('mock-user-')) {
-        // For real users, get profile from Supabase
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (profile && profile.is_business_verified) {
-            // Business users get special routing
-            const businessRedirect = redirectTo.includes('/business') ? redirectTo : '/business/dashboard';
-            router.replace(businessRedirect);
-          } else if (profile) {
-            // Regular users with profile
-            router.replace(redirectTo);
-          } else {
-            // New user without profile
-            router.replace('/profile/setup');
-          }
-        } catch (error) {
-          logger.error('Profile fetch error', error, 'LoginPage');
-          // Default redirect on error
-          router.replace('/dashboard');
-        }
-      }
+      // Use router.push for navigation within the app
+      router.push(redirectPath);
     } catch (error) {
-      logger.error('Login success handler error', error, 'LoginPage');
-      // Fallback redirect
-      router.replace('/dashboard');
+      logger.error('Login redirect error', error, 'LoginPage');
+      
+      // Fallback to dashboard on error
+      router.push('/dashboard');
     }
   };
 
-  // Handle redirect to signup
+  /**
+   * Handle redirect to signup page
+   */
   const handleSignupRedirect = () => {
-    router.push('/auth/signup');
+    // Preserve the redirect parameter if it exists
+    const redirectParam = searchParams.get('redirect');
+    const signupUrl = redirectParam 
+      ? `/auth/signup?redirect=${encodeURIComponent(redirectParam)}`
+      : '/auth/signup';
+    
+    router.push(signupUrl);
   };
 
   // Show loading spinner while checking auth
@@ -98,6 +93,7 @@ export default function LoginPage() {
     );
   }
 
+  // Render login component
   return (
     <Login 
       onSuccess={handleLoginSuccess}

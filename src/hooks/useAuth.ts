@@ -1,105 +1,15 @@
 /**
- * MAJOR UPDATE: Enhanced useAuth Hook with Mock Authentication System
- * ================================================================
+ * useAuth Hook - Yalla Souq Palestinian Marketplace
  * 
- * This file has been significantly enhanced to include a comprehensive mock authentication
- * system that works alongside the existing Supabase authentication. This update solves
- * several critical development issues:
- * 
- * 🚀 PROBLEM SOLVED: Supabase 400 Bad Request Errors During Development
- * =====================================================================
- * Previously, developers were experiencing 400 errors when trying to authenticate
- * with Supabase during development. This was blocking the development workflow
- * and preventing testing of authentication-dependent features.
- * 
- * 💡 SOLUTION: Environment-Based Authentication Switching
- * =======================================================
- * The hook now intelligently switches between:
- * - MOCK MODE: When NEXT_PUBLIC_USE_MOCK_DATA=true (development)
- * - REAL MODE: When NEXT_PUBLIC_USE_MOCK_DATA=false (production)
- * 
- * 🔧 NEW FEATURES IMPLEMENTED:
- * ============================
- * 
- * 1. SMART AUTHENTICATION DETECTION:
- *    - Automatically detects environment mode from .env.local
- *    - Seamlessly switches between mock and real authentication
- *    - No code changes needed in components using this hook
- * 
- * 2. REALISTIC MOCK USER DATA:
- *    - Palestinian marketplace-specific user profiles
- *    - Complete user objects with all required fields
- *    - Realistic timestamps and Palestinian phone numbers
- *    - Business verification status and preferences
- * 
- * 3. MOCK AUTHENTICATION LOGIC:
- *    - Predefined valid email addresses for testing
- *    - Password validation (minimum 6 characters)
- *    - Simulated network delay for realistic UX
- *    - Proper success/failure response handling
- * 
- * 4. SECURITY FEATURES PRESERVED:
- *    - Login attempt tracking works in both modes
- *    - Account lockout protection maintained
- *    - Remember me functionality operational
- *    - Arabic error messages for user experience
- * 
- * 📧 VALID TEST CREDENTIALS:
- * ==========================
- * When in mock mode, use any of these emails:
- * - admin@yallasouq.ps      (Admin user)
- * - user@yallasouq.ps       (Regular user)
- * - test@yallasouq.ps       (Test user)
- * - maria-ashhab@gmail.com  (Real user from error logs)
- * 
- * Password: Any string with 6+ characters
- * 
- * 🔄 BACKWARDS COMPATIBILITY:
- * ===========================
- * - All existing components work without modification
- * - Same API interface maintained
- * - No breaking changes to login/logout flow
- * - Seamless transition between development and production
- * 
- * 🎯 DEVELOPMENT WORKFLOW IMPROVEMENT:
- * ===================================
- * Before: Developers had to deal with Supabase connection issues
- * After: Instant authentication testing with realistic data
- * 
- * 📈 PERFORMANCE BENEFITS:
- * =======================
- * - No external API calls during development testing
- * - Faster authentication response times
- * - Reduced dependency on external services
- * - Offline development capability
- * 
- * 🛡️ PRODUCTION SAFETY:
- * =====================
- * - Mock mode automatically disabled in production
- * - Real Supabase authentication used when needed
- * - Environment variable controls switching
- * - No security compromises in live environment
- * 
- * 🚀 USAGE IN COMPONENTS:
- * ======================
- * Components use this hook exactly as before:
- * 
- * const { login, user, isAuthenticated } = useAuth();
- * 
- * // Login works the same way
- * await login({ email, password, rememberMe });
- * 
- * The hook handles mock vs real authentication internally.
- * 
- * @version 2.1.0 - Mock Authentication System
- * @author Yalla Souq Development Team
- * @date 2025-07-14
+ * This hook provides centralized authentication functionality for the entire application.
+ * It handles user login, signup, logout, and session management with both real Supabase
+ * authentication and mock authentication for development.
  */
-
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, getUserProfile } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
-// Enhanced types for marketplace
+// User profile interface
 interface User {
   id: string;
   email: string;
@@ -146,6 +56,7 @@ interface User {
   updated_at: string;
 }
 
+// Authentication session state
 interface AuthSession {
   user: User | null;
   isLoading: boolean;
@@ -153,17 +64,20 @@ interface AuthSession {
   isAuthenticated: boolean;
 }
 
+// Authentication error
 interface AuthError {
   code?: string;
   message: string;
 }
 
+// Login credentials
 interface LoginCredentials {
   email: string;
   password: string;
   rememberMe?: boolean;
 }
 
+// Signup data
 interface SignupData {
   email: string;
   password: string;
@@ -174,6 +88,7 @@ interface SignupData {
   receiveNewsletter?: boolean;
 }
 
+// Authentication response
 interface AuthResponse {
   success: boolean;
   error?: AuthError;
@@ -181,26 +96,26 @@ interface AuthResponse {
   session?: any;
 }
 
+/**
+ * Main authentication hook
+ * Provides complete authentication functionality for the application
+ */
 export const useAuth = () => {
-  // 🏛️ AUTHENTICATION STATE MANAGEMENT
-  // ===================================
-  // Central state that tracks user authentication status, loading states,
-  // and any authentication errors. This state is shared across all components.
+  // Authentication session state
   const [session, setSession] = useState<AuthSession>({
-    user: null,                    // 👤 Current authenticated user (null = not logged in)
-    isLoading: true,               // ⏳ Loading state for async auth operations
-    error: null,                   // ❌ Any authentication errors
-    isAuthenticated: false,        // ✅ Boolean flag for authentication status
+    user: null,
+    isLoading: true,
+    error: null,
+    isAuthenticated: false,
   });
 
-  // 🔒 SECURITY STATE MANAGEMENT
-  // ============================
-  // Track login attempts for brute force protection and temporary account blocking
-  const [loginAttempts, setLoginAttempts] = useState<number>(0);  // 📊 Failed login counter
-  const [isBlocked, setIsBlocked] = useState<boolean>(false);     // 🚫 Account block status
+  // Security tracking state
+  const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [isBlocked, setIsBlocked] = useState<boolean>(false);
 
   /**
    * Initialize authentication session
+   * Checks for existing session and sets up auth state change listener
    */
   useEffect(() => {
     let mounted = true;
@@ -213,7 +128,7 @@ export const useAuth = () => {
         if (!mounted) return;
 
         if (error) {
-          console.error('Session error:', error);
+          logger.error('Session initialization error', error, 'useAuth');
           setSession({ 
             user: null, 
             isLoading: false, 
@@ -230,7 +145,7 @@ export const useAuth = () => {
             const isMockUser = authSession.user.id.startsWith('mock-user-');
             
             if (useMockData && isMockUser) {
-              // Create mock user profile directly without Supabase query
+              // Create mock user profile for development
               const mockProfile = {
                 id: authSession.user.id,
                 email: authSession.user.email || '',
@@ -258,8 +173,10 @@ export const useAuth = () => {
                 error: null, 
                 isAuthenticated: true 
               });
+              
+              logger.info('Mock user session restored', { userId: mockProfile.id }, 'useAuth');
             } else {
-              // Fetch full user profile from Supabase
+              // Fetch real user profile from Supabase
               const profile = await getUserProfile(authSession.user.id);
               
               if (!mounted) return;
@@ -270,13 +187,15 @@ export const useAuth = () => {
                 error: null, 
                 isAuthenticated: true 
               });
+              
+              logger.info('User session restored', { userId: profile.id }, 'useAuth');
             }
 
             // Track successful login
             localStorage.setItem('yalla-souq-last-login', new Date().toISOString());
             
           } catch (profileError: any) {
-            console.error('Profile fetch error:', profileError);
+            logger.error('Profile fetch error', profileError, 'useAuth');
             
             if (!mounted) return;
             
@@ -295,9 +214,11 @@ export const useAuth = () => {
             error: null, 
             isAuthenticated: false 
           });
+          
+          logger.debug('No active session found', null, 'useAuth');
         }
       } catch (error: any) {
-        console.error('Auth initialization error:', error);
+        logger.error('Auth initialization error', error, 'useAuth');
         
         if (!mounted) return;
         
@@ -310,6 +231,7 @@ export const useAuth = () => {
       }
     };
 
+    // Initialize authentication
     initializeAuth();
 
     // Listen for auth state changes
@@ -317,7 +239,7 @@ export const useAuth = () => {
       async (event, authSession) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event);
+        logger.debug('Auth state changed:', event, 'useAuth');
 
         switch (event) {
           case 'SIGNED_IN':
@@ -328,7 +250,7 @@ export const useAuth = () => {
                 const isMockUser = authSession.user.id.startsWith('mock-user-');
                 
                 if (useMockData && isMockUser) {
-                  // Create mock user profile directly without Supabase query
+                  // Create mock user profile for development
                   const mockProfile = {
                     id: authSession.user.id,
                     email: authSession.user.email || '',
@@ -356,8 +278,10 @@ export const useAuth = () => {
                     error: null, 
                     isAuthenticated: true 
                   });
+                  
+                  logger.info('User signed in (mock)', { userId: mockProfile.id }, 'useAuth');
                 } else {
-                  // Fetch full user profile from Supabase
+                  // Fetch real user profile from Supabase
                   const profile = await getUserProfile(authSession.user.id);
                   
                   if (!mounted) return;
@@ -368,6 +292,8 @@ export const useAuth = () => {
                     error: null, 
                     isAuthenticated: true 
                   });
+                  
+                  logger.info('User signed in', { userId: profile.id }, 'useAuth');
                 }
 
                 // Reset login attempts on successful login
@@ -378,7 +304,7 @@ export const useAuth = () => {
                 localStorage.setItem('yalla-souq-last-login', new Date().toISOString());
                 
               } catch (error: any) {
-                console.error('Profile fetch on auth change:', error);
+                logger.error('Profile fetch on auth change', error, 'useAuth');
                 
                 if (!mounted) return;
                 
@@ -404,11 +330,13 @@ export const useAuth = () => {
 
             // Clear stored data
             localStorage.removeItem('yalla-souq-last-login');
-            localStorage.removeItem('yalla-souq-remember-email');
+            // Keep remember email if it exists
+            
+            logger.info('User signed out', null, 'useAuth');
             break;
 
           case 'TOKEN_REFRESHED':
-            console.log('Token refreshed successfully');
+            logger.debug('Token refreshed successfully', null, 'useAuth');
             break;
 
           default:
@@ -417,6 +345,7 @@ export const useAuth = () => {
       }
     );
 
+    // Cleanup subscription on unmount
     return () => {
       mounted = false;
       subscription.unsubscribe();
@@ -424,164 +353,120 @@ export const useAuth = () => {
   }, []);
 
   /**
-   * Enhanced Login Method with Intelligent Authentication Switching
-   * ==============================================================
-   * 
-   * 🚀 NEW FEATURE: This method now supports both mock and real authentication
-   * based on the NEXT_PUBLIC_USE_MOCK_DATA environment variable. This eliminates
-   * development blockers while maintaining production security.
-   * 
-   * 🔄 AUTHENTICATION FLOW:
-   * ======================
-   * 1. Security Check: Verifies user isn't temporarily blocked
-   * 2. Environment Detection: Checks mock data flag
-   * 3. Mock Authentication (Development):
-   *    - Validates predefined test credentials
-   *    - Creates realistic Palestinian user profile
-   *    - Simulates network delay for realistic UX
-   *    - Handles remember me functionality
-   * 4. Real Authentication (Production):
-   *    - Uses Supabase authentication service
-   *    - Implements security features and rate limiting
-   *    - Handles all production edge cases
-   * 
-   * 🛡️ SECURITY FEATURES (Both Modes):
-   * ==================================
-   * - Login attempt tracking and rate limiting
-   * - Account lockout after 5 failed attempts
-   * - 15-minute cooldown period for blocked accounts
-   * - Secure session management
-   * - Arabic error messages for better UX
-   * 
-   * 📧 MOCK MODE CREDENTIALS:
-   * ========================
-   * Valid emails for testing:
-   * - admin@yallasouq.ps (Administrator)
-   * - user@yallasouq.ps (Regular user) 
-   * - test@yallasouq.ps (Test account)
-   * - maria-ashhab@gmail.com (Real user from logs)
-   * 
-   * Password: Any string with 6+ characters
-   * 
-   * 🎯 DEVELOPMENT BENEFITS:
-   * =======================
-   * - No Supabase connectivity required for testing
-   * - Instant authentication without network delays
-   * - Consistent test data for development
-   * - Offline development capability
-   * - Realistic user profiles with Palestinian data
-   * 
-   * @param credentials - Login credentials with email, password, and optional rememberMe
-   * @returns Promise<AuthResponse> - Success/failure response with user data
+   * Login method
+   * Handles both mock and real authentication based on environment
    */
   const login = useCallback(async ({ email, password, rememberMe = false }: LoginCredentials): Promise<AuthResponse> => {
     // Check if blocked due to too many attempts
     if (isBlocked) {
+      logger.warn('Login blocked due to too many attempts', null, 'useAuth');
       return {
         success: false,
         error: { message: 'تم حظر المحاولات لمدة مؤقتة، يرجى المحاولة لاحقاً' }
       };
     }
 
+    // Set loading state
     setSession(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // 🔧 NEW: Environment-Based Authentication Mode Detection
-      // This intelligent detection allows seamless switching between development and production
+      // Check if using mock data
       const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
       
       if (useMockData) {
-        // 🎭 MOCK AUTHENTICATION MODE (Development Only)
-        // =============================================
-        // This branch provides a complete authentication simulation for development
-        // purposes, eliminating external dependencies and providing consistent test data.
+        // MOCK AUTHENTICATION (Development)
+        logger.debug('Using mock authentication for development', { email }, 'useAuth');
         
-        console.log('🎯 Using mock authentication for development environment');
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 800));
         
-        // 🕐 Simulate realistic network delay
-        // This maintains the authentic feel of real authentication calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 📧 Predefined test credentials for Palestinian marketplace
-        // These emails provide different user types for comprehensive testing
+        // Valid test emails for development
         const validEmails = [
-          'admin@yallasouq.ps',      // 👑 Admin user with full privileges
-          'user@yallasouq.ps',       // 👤 Regular marketplace user
-          'test@yallasouq.ps',       // 🧪 Testing account
-          'maria-ashhab@gmail.com'   // 🔍 Real user from error logs
+          'admin@yallasouq.ps',
+          'user@yallasouq.ps',
+          'test@yallasouq.ps',
+          'maria-ashhab@gmail.com'
         ];
         
-        // ✅ Authentication validation logic
+        // Check credentials
         if (validEmails.includes(email.trim().toLowerCase()) && password.length >= 6) {
-          // 🏗️ Create realistic Palestinian marketplace user profile
-          // This mock user contains all fields that real users would have
+          // Create mock user
           const mockUser = {
-            id: 'mock-user-' + Date.now(),                    // 🆔 Unique identifier
-            email: email.trim().toLowerCase(),                // 📧 Normalized email
-            first_name: 'مستخدم',                            // 👤 Arabic first name
-            last_name: 'تجريبي',                             // 👤 Arabic last name
-            phone: '+970123456789',                           // 📱 Palestinian phone format
-            is_business_verified: false,                      // 🏢 Business status
-            email_notifications: true,                        // 📧 Email preferences
-            sms_notifications: true,                          // 📱 SMS preferences
-            marketing_emails: true,                           // 📬 Marketing preferences
-            profile_visibility: 'public' as const,           // 👁️ Privacy settings
-            language: 'ar' as const,                          // 🌐 Arabic language
-            email_verified: true,                             // ✅ Email verification
-            phone_verified: true,                             // ✅ Phone verification
-            account_status: 'active' as const,                // 🟢 Account status
-            created_at: new Date().toISOString(),             // 📅 Creation timestamp
-            updated_at: new Date().toISOString()              // 📅 Update timestamp
+            id: 'mock-user-' + Date.now(),
+            email: email.trim().toLowerCase(),
+            first_name: 'مستخدم',
+            last_name: 'تجريبي',
+            phone: '+970123456789',
+            is_business_verified: false,
+            email_notifications: true,
+            sms_notifications: true,
+            marketing_emails: true,
+            profile_visibility: 'public' as const,
+            language: 'ar' as const,
+            email_verified: true,
+            phone_verified: true,
+            account_status: 'active' as const,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           } as User;
           
-          // 🔄 Update authentication session state
-          // This mirrors the exact behavior of real authentication
+          // Create mock session
+          const mockSession = {
+            access_token: 'mock-token-' + Date.now(),
+            refresh_token: 'mock-refresh-' + Date.now(),
+            expires_at: Date.now() + 3600000,
+            user: mockUser
+          };
+          
+          // Update session state
           setSession({
-            user: mockUser,                    // 👤 Set authenticated user
-            isLoading: false,                  // ⏳ Stop loading state
-            isAuthenticated: true,             // ✅ Mark as authenticated
-            error: null                        // 🚫 Clear any errors
+            user: mockUser,
+            isLoading: false,
+            isAuthenticated: true,
+            error: null
           });
           
-          // 🔒 Reset security counters on successful authentication
-          // This maintains the same security behavior as real authentication
-          setLoginAttempts(0);                 // 🔄 Reset failed attempts
-          setIsBlocked(false);                 // 🔓 Unblock account
+          // Reset login attempts
+          setLoginAttempts(0);
+          setIsBlocked(false);
           
-          // 💾 Handle "Remember Me" functionality
-          // This preserves user preference for future logins
+          // Handle remember me
           if (rememberMe) {
             localStorage.setItem('yalla-souq-remember-email', email);
           } else {
             localStorage.removeItem('yalla-souq-remember-email');
           }
           
-          console.log('✅ Mock authentication successful', { email });
+          logger.info('Mock authentication successful', { email }, 'useAuth');
           
-          // 🎉 Return success response with user data
           return {
             success: true,
             user: mockUser,
-            session: {
-              access_token: 'mock-token-' + Date.now(),
-              refresh_token: 'mock-refresh-' + Date.now(),
-              expires_at: Date.now() + 3600000,
-              user: mockUser
-            }
+            session: mockSession
           };
         } else {
-          // ❌ MOCK AUTHENTICATION FAILED
-          // =============================
-          // Handle invalid credentials with the same security measures as real auth
-          
+          // Mock authentication failed
           const newAttempts = loginAttempts + 1;
-          setLoginAttempts(newAttempts);       // 📈 Increment failed attempts
+          setLoginAttempts(newAttempts);
+          
+          // Block after 5 failed attempts
+          if (newAttempts >= 5) {
+            setIsBlocked(true);
+            setTimeout(() => {
+              setIsBlocked(false);
+              setLoginAttempts(0);
+            }, 15 * 60 * 1000); // 15 minutes
+            
+            logger.warn('Account temporarily blocked after 5 failed attempts', { email }, 'useAuth');
+          }
           
           setSession(prev => ({ 
             ...prev, 
-            isLoading: false,                  // ⏳ Stop loading
+            isLoading: false, 
             error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' 
           }));
+          
+          logger.warn('Mock authentication failed', { email, attempts: newAttempts }, 'useAuth');
           
           return {
             success: false,
@@ -590,10 +475,9 @@ export const useAuth = () => {
         }
       }
       
-      // 🔗 REAL SUPABASE AUTHENTICATION (Production Mode)
-      // ==================================================
-      // When mock mode is disabled, use the real Supabase authentication service
-      console.log('🔐 Using Supabase authentication for production', { email });
+      // REAL SUPABASE AUTHENTICATION (Production)
+      logger.debug('Using Supabase authentication', { email }, 'useAuth');
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
@@ -618,6 +502,8 @@ export const useAuth = () => {
           isLoading: false, 
           error: getErrorMessage(error.message) 
         }));
+        
+        logger.warn('Authentication failed', { error: error.message, attempts: newAttempts }, 'useAuth');
 
         return {
           success: false,
@@ -625,15 +511,26 @@ export const useAuth = () => {
         };
       }
 
-      // Remember email if requested
+      // Handle remember me
       if (rememberMe && data.user) {
         localStorage.setItem('yalla-souq-remember-email', email);
+      } else {
+        localStorage.removeItem('yalla-souq-remember-email');
       }
+      
+      logger.info('Authentication successful', { userId: data.user?.id }, 'useAuth');
 
-      return { success: true, user: data.user as unknown as User };
+      return { 
+        success: true, 
+        user: data.user as unknown as User,
+        session: data.session
+      };
 
     } catch (error: any) {
+      // Handle unexpected errors
       const errorMessage = 'حدث خطأ غير متوقع أثناء تسجيل الدخول';
+      
+      logger.error('Login error', error, 'useAuth');
       
       setSession(prev => ({ 
         ...prev, 
@@ -649,11 +546,13 @@ export const useAuth = () => {
   }, [loginAttempts, isBlocked]);
 
   /**
-   * Enhanced signup with profile creation
+   * Signup method
+   * Registers a new user and creates their profile
    */
   const signup = useCallback(async (signupData: SignupData): Promise<AuthResponse> => {
     const { email, password, firstName, lastName, phone, acceptTerms, receiveNewsletter = false } = signupData;
 
+    // Validate terms acceptance
     if (!acceptTerms) {
       return {
         success: false,
@@ -661,9 +560,81 @@ export const useAuth = () => {
       };
     }
 
+    // Set loading state
     setSession(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      // Check if using mock data
+      const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+      
+      if (useMockData) {
+        // MOCK SIGNUP (Development)
+        logger.debug('Using mock signup for development', { email }, 'useAuth');
+        
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if email is already used
+        const existingEmails = [
+          'admin@yallasouq.ps',
+          'user@yallasouq.ps',
+          'test@yallasouq.ps'
+        ];
+        
+        if (existingEmails.includes(email.trim().toLowerCase())) {
+          setSession(prev => ({ 
+            ...prev, 
+            isLoading: false, 
+            error: 'هذا البريد الإلكتروني مسجل مسبقاً' 
+          }));
+          
+          logger.warn('Mock signup failed - email already exists', { email }, 'useAuth');
+          
+          return {
+            success: false,
+            error: { message: 'هذا البريد الإلكتروني مسجل مسبقاً' }
+          };
+        }
+        
+        // Create mock user
+        const mockUser = {
+          id: 'mock-user-' + Date.now(),
+          email: email.trim().toLowerCase(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone: phone?.trim() || '+970123456789',
+          is_business_verified: false,
+          email_notifications: true,
+          sms_notifications: !!phone,
+          marketing_emails: receiveNewsletter,
+          profile_visibility: 'public' as const,
+          language: 'ar' as const,
+          email_verified: true,
+          phone_verified: !!phone,
+          account_status: 'active' as const,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as User;
+        
+        // Update session state
+        setSession({
+          user: mockUser,
+          isLoading: false,
+          isAuthenticated: true,
+          error: null
+        });
+        
+        logger.info('Mock signup successful', { email }, 'useAuth');
+        
+        return {
+          success: true,
+          user: mockUser
+        };
+      }
+      
+      // REAL SUPABASE SIGNUP (Production)
+      logger.debug('Using Supabase signup', { email }, 'useAuth');
+      
       // Create auth user
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -684,6 +655,8 @@ export const useAuth = () => {
           isLoading: false, 
           error: getErrorMessage(error.message) 
         }));
+        
+        logger.warn('Signup failed', { error: error.message }, 'useAuth');
 
         return {
           success: false,
@@ -691,7 +664,7 @@ export const useAuth = () => {
         };
       }
 
-      // The profile will be created automatically via database trigger
+      // Update profile with additional fields
       if (data.user) {
         try {
           await supabase
@@ -705,17 +678,23 @@ export const useAuth = () => {
               account_status: 'active',
             })
             .eq('id', data.user.id);
-
+            
+          logger.info('Profile updated after signup', { userId: data.user.id }, 'useAuth');
         } catch (profileError) {
-          console.error('Profile update error:', profileError);
+          logger.error('Profile update error after signup', profileError, 'useAuth');
           // Don't fail signup for profile update errors
         }
       }
+      
+      logger.info('Signup successful', { userId: data.user?.id }, 'useAuth');
 
       return { success: true, user: data.user as unknown as User };
 
     } catch (error: any) {
+      // Handle unexpected errors
       const errorMessage = 'حدث خطأ غير متوقع أثناء إنشاء الحساب';
+      
+      logger.error('Signup error', error, 'useAuth');
       
       setSession(prev => ({ 
         ...prev, 
@@ -731,30 +710,40 @@ export const useAuth = () => {
   }, []);
 
   /**
-   * Logout with cleanup
+   * Logout method
+   * Signs out the current user and clears session data
    */
   const logout = useCallback(async (): Promise<void> => {
     try {
+      logger.debug('Attempting to sign out user', null, 'useAuth');
+      
+      // Sign out from Supabase
       await supabase.auth.signOut();
       
-      // Clear all stored data
+      // Clear stored data
       localStorage.removeItem('yalla-souq-last-login');
       // Keep remember email if it exists
       
+      logger.info('User signed out successfully', null, 'useAuth');
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error', error, 'useAuth');
     }
   }, []);
 
   /**
    * Update user profile
+   * Updates the current user's profile information
    */
   const updateProfile = useCallback(async (updates: Partial<User>): Promise<AuthResponse> => {
     if (!session.user) {
+      logger.warn('Update profile attempted without authentication', null, 'useAuth');
       return { success: false, error: { message: 'لم يتم تسجيل الدخول' } };
     }
 
     try {
+      logger.debug('Updating user profile', { userId: session.user.id }, 'useAuth');
+      
+      // Update profile in Supabase
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -764,6 +753,7 @@ export const useAuth = () => {
         .eq('id', session.user.id);
 
       if (error) {
+        logger.error('Profile update error', error, 'useAuth');
         return { 
           success: false, 
           error: { message: getErrorMessage(error.message) } 
@@ -775,10 +765,13 @@ export const useAuth = () => {
         ...prev,
         user: prev.user ? { ...prev.user, ...updates } : null,
       }));
+      
+      logger.info('Profile updated successfully', { userId: session.user.id }, 'useAuth');
 
       return { success: true };
 
     } catch (error: any) {
+      logger.error('Profile update error', error, 'useAuth');
       return { 
         success: false, 
         error: { message: 'فشل في تحديث البيانات' } 
@@ -788,23 +781,31 @@ export const useAuth = () => {
 
   /**
    * Reset password
+   * Sends a password reset email to the specified address
    */
   const resetPassword = useCallback(async (email: string): Promise<AuthResponse> => {
     try {
+      logger.debug('Requesting password reset', { email }, 'useAuth');
+      
+      // Request password reset from Supabase
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
       if (error) {
+        logger.error('Password reset request error', error, 'useAuth');
         return { 
           success: false, 
           error: { message: getErrorMessage(error.message) } 
         };
       }
+      
+      logger.info('Password reset email sent', { email }, 'useAuth');
 
       return { success: true };
 
     } catch (error: any) {
+      logger.error('Password reset error', error, 'useAuth');
       return { 
         success: false, 
         error: { message: 'فشل في إرسال رابط إعادة تعيين كلمة المرور' } 
@@ -814,6 +815,7 @@ export const useAuth = () => {
 
   /**
    * Check if user has specific permission
+   * Determines if the current user has access to specific features
    */
   const hasPermission = useCallback((permission: string): boolean => {
     if (!session.user) return false;
@@ -832,6 +834,7 @@ export const useAuth = () => {
 
   /**
    * Get user display name
+   * Returns formatted user name for display
    */
   const getDisplayName = useCallback((): string => {
     if (!session.user) return '';
@@ -848,16 +851,8 @@ export const useAuth = () => {
   }, [session.user]);
 
   /**
-   * Arabic Error Message Translation System
-   * =======================================
-   * 
-   * 🌐 LOCALIZATION: Converts English Supabase error messages to Arabic
-   * This provides a better user experience for Arabic-speaking users in Palestine
-   * 
-   * 🎯 COVERAGE: Handles all common authentication errors with culturally appropriate messaging
-   * 
-   * @param error - English error message from Supabase
-   * @returns Arabic error message for display to users
+   * Convert Supabase errors to Arabic messages
+   * Provides user-friendly error messages in Arabic
    */
   const getErrorMessage = (error: string): string => {
     const errorMap: Record<string, string> = {
@@ -873,53 +868,32 @@ export const useAuth = () => {
     return errorMap[error] || error;
   };
 
-  // 🚀 PUBLIC API: Hook Interface
-  // =============================
-  // This return object provides all authentication functionality to components
+  // Return authentication state and methods
   return {
-    // 📊 Session State - Current authentication status and user data
-    session,                       // 🏛️ Complete session object
-    user: session.user,            // 👤 Current user (shortcut)
-    isLoading: session.isLoading,  // ⏳ Loading state (shortcut)
-    isAuthenticated: session.isAuthenticated,  // ✅ Auth status (shortcut)
-    error: session.error,          // ❌ Error state (shortcut)
+    // Session state
+    session,
+    user: session.user,
+    isLoading: session.isLoading,
+    isAuthenticated: session.isAuthenticated,
+    error: session.error,
 
-    // 🔐 Authentication Methods - Core auth functionality
-    login,                         // 🔑 Login with email/password
-    signup,                        // 📝 Create new account
-    logout,                        // 🚪 Sign out user
-    updateProfile,                 // ✏️ Update user profile
-    resetPassword,                 // 🔄 Password reset
+    // Authentication methods
+    login,
+    signup,
+    logout,
+    updateProfile,
+    resetPassword,
 
-    // 🛠️ Utility Methods - Helper functions
-    hasPermission,                 // 🔒 Check user permissions
-    getDisplayName,                // 🏷️ Get formatted user name
+    // Utility methods
+    hasPermission,
+    getDisplayName,
 
-    // 🛡️ Security State - Security monitoring
-    loginAttempts,                 // 📊 Failed login count
-    isBlocked,                     // 🚫 Account block status
+    // Security state
+    loginAttempts,
+    isBlocked,
   };
 };
 
-// 📤 EXPORTS: Type definitions and hook
-// ====================================
-// Export all TypeScript interfaces for use in other components
+// Export types and hook
 export type { User, AuthSession, LoginCredentials, SignupData, AuthResponse };
-
-// Export the main authentication hook as default
 export default useAuth;
-
-/**
- * 🎉 IMPLEMENTATION COMPLETE
- * =========================
- * 
- * This enhanced useAuth hook now provides:
- * ✅ Mock authentication for development
- * ✅ Real Supabase authentication for production
- * ✅ Comprehensive security features
- * ✅ Palestinian marketplace integration
- * ✅ Arabic localization
- * ✅ Complete TypeScript support
- * 
- * Ready for use across the entire application!
- */
