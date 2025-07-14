@@ -1,76 +1,9 @@
 /**
- * Signup Component - Yalla Souq Palestinian Marketplace Registration
+ * Signup Component - Yalla Souq Palestinian Marketplace
  * 
- * Comprehensive user registration component providing secure signup functionality
- * for new users joining the Palestinian marketplace platform. This component handles
- * complete user onboarding including personal information collection, email verification,
- * business account setup, and seamless integration with the authentication system.
- * 
- * Registration Features:
- * - Complete user profile creation with personal details
- * - Email verification workflow with confirmation links
- * - Business account registration with verification process
- * - Phone number validation and verification for Palestinian numbers
- * - Password strength validation with security requirements
- * - Terms of service and privacy policy acceptance
- * - Profile picture upload and management
- * - Multi-step form with progress tracking
- * 
- * Security Implementation:
- * - Supabase authentication integration
- * - Email verification for account activation
- * - Password strength requirements enforcement
- * - Input sanitization and validation
- * - Rate limiting for registration attempts
- * - CAPTCHA integration for bot protection
- * - Data encryption for sensitive information
- * 
- * User Experience Features:
- * - Multi-step registration wizard with clear progress indicators
- * - Real-time validation with immediate feedback
- * - Auto-completion support for faster form filling
- * - Responsive design optimized for mobile registration
- * - RTL (Right-to-Left) support for Arabic interface
- * - Accessibility compliance with screen reader support
- * - Error handling with contextual help messages
- * 
- * Business Logic:
- * - User type detection (individual vs business)
- * - Regional customization for Palestinian market
- * - Referral system integration for user acquisition
- * - Welcome email automation with platform introduction
- * - Account verification levels and trust building
- * - Analytics integration for registration funnel tracking
- * 
- * Form Management:
- * - Advanced form validation with Palestinian-specific rules
- * - File upload handling for profile pictures and documents
- * - Form state persistence across page refreshes
- * - Error recovery and retry mechanisms
- * - Progressive enhancement for better performance
- * 
- * Integration Points:
- * - Supabase Auth for secure user creation
- * - Email service for verification and welcome messages
- * - File storage service for document and image uploads
- * - Analytics services for registration tracking
- * - CRM integration for user lifecycle management
- * 
- * Palestinian Market Features:
- * - Arabic language support with proper typography
- * - Palestinian phone number format validation
- * - Local business verification integration
- * - Cultural considerations in user onboarding
- * - Regional compliance with Palestinian regulations
- * 
- * @component Signup
- * @returns {JSX.Element} Complete registration interface with multi-step form
- * 
- * @author Yalla Souq Development Team
- * @version 2.1.0
- * @since 1.0.0
+ * This component handles new user registration with comprehensive form validation,
+ * password strength checking, and integration with the authentication system.
  */
-
 import React, { useState, useCallback } from 'react';
 import { 
   Eye, 
@@ -81,13 +14,12 @@ import {
   Phone, 
   AlertCircle, 
   CheckCircle,
-  Loader2,
-  Shield,
-  Star
+  Shield
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/lib/logger';
 
+// Form data interface
 interface SignupFormData {
   firstName: string;
   lastName: string;
@@ -99,24 +31,30 @@ interface SignupFormData {
   receiveNewsletter: boolean;
 }
 
+// Error interface
 interface SignupError {
   field?: keyof SignupFormData | 'general';
   message: string;
 }
 
+// Password strength interface
 interface PasswordStrength {
   score: number;
   feedback: string[];
   color: 'red' | 'orange' | 'yellow' | 'green';
 }
 
+// Component props
 interface SignupProps {
   onSuccess?: (user: any) => void;
   onLoginRedirect?: () => void;
 }
 
 const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
-  // Component state
+  // Get signup method from useAuth hook
+  const { signup } = useAuth();
+  
+  // Form state
   const [formData, setFormData] = useState<SignupFormData>({
     firstName: '',
     lastName: '',
@@ -128,6 +66,7 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
     receiveNewsletter: true
   });
   
+  // UI state
   const [errors, setErrors] = useState<SignupError[]>([]);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
@@ -141,6 +80,7 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
 
   /**
    * Calculate password strength
+   * Evaluates password strength based on length, character types, and complexity
    */
   const calculatePasswordStrength = useCallback((password: string): PasswordStrength => {
     if (!password) {
@@ -185,6 +125,7 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
       feedback.push('أضف رمز خاص (!@#$...)');
     }
 
+    // Determine color based on score
     const colors: Record<number, 'red' | 'orange' | 'yellow' | 'green'> = {
       0: 'red', 1: 'red', 2: 'orange', 3: 'yellow', 4: 'green', 5: 'green'
     };
@@ -197,7 +138,8 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
   }, []);
 
   /**
-   * Real form validation
+   * Form validation
+   * Validates all form fields and returns true if valid
    */
   const validateForm = useCallback((): boolean => {
     const newErrors: SignupError[] = [];
@@ -225,9 +167,11 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
     }
     
     // Phone validation (Palestinian numbers)
-    const phoneRegex = /^(\+970|0)?[5-9]\d{8}$/;
-    if (formData.phone && !phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.push({ field: 'phone', message: 'رقم هاتف فلسطيني صحيح مطلوب (مثال: 0599123456)' });
+    if (formData.phone) {
+      const phoneRegex = /^(\+970|0)?[5-9]\d{8}$/;
+      if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+        newErrors.push({ field: 'phone', message: 'رقم هاتف فلسطيني صحيح مطلوب (مثال: 0599123456)' });
+      }
     }
     
     // Password validation
@@ -255,6 +199,7 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
 
   /**
    * Handle input changes
+   * Updates form state and clears related errors
    */
   const handleInputChange = useCallback((field: keyof SignupFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -270,81 +215,45 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
   }, [calculatePasswordStrength]);
 
   /**
-   * Handle real Supabase signup
+   * Form submission handler
+   * Validates form and calls signup method from useAuth hook
    */
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    // Validate form
+    if (!validateForm()) {
+      logger.debug('Signup form validation failed', null, 'Signup');
+      return;
+    }
     
+    // Set loading state
     setIsSubmitting(true);
     setErrors([]);
     setSuccessMessage('');
     
     try {
-      // Create user account with Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      logger.info('Attempting to create new account', { email: formData.email }, 'Signup');
+      
+      // Call signup method from useAuth hook
+      const result = await signup({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName.trim(),
-            last_name: formData.lastName.trim(),
-            phone: formData.phone.trim(),
-            marketing_emails: formData.receiveNewsletter
-          }
-        }
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        acceptTerms: formData.acceptTerms,
+        receiveNewsletter: formData.receiveNewsletter
       });
 
-      if (signUpError) {
-        // Handle specific Supabase signup errors
-        if (signUpError.message.includes('User already registered')) {
-          setErrors([{ field: 'email', message: 'هذا البريد الإلكتروني مسجل مسبقاً' }]);
-        } else if (signUpError.message.includes('Password should be at least 6 characters')) {
-          setErrors([{ field: 'password', message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' }]);
-        } else if (signUpError.message.includes('Invalid email')) {
-          setErrors([{ field: 'email', message: 'البريد الإلكتروني غير صحيح' }]);
-        } else if (signUpError.message.includes('Signup is disabled')) {
-          setErrors([{ field: 'general', message: 'التسجيل معطل حالياً، يرجى المحاولة لاحقاً' }]);
-        } else {
-          setErrors([{ field: 'general', message: signUpError.message }]);
-        }
-        return;
-      }
-
-      if (data.user) {
-        // Update the user profile with additional information
-        try {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({
-              first_name: formData.firstName.trim(),
-              last_name: formData.lastName.trim(),
-              phone: formData.phone.trim() || null,
-              email_notifications: true,
-              sms_notifications: !!formData.phone,
-              marketing_emails: formData.receiveNewsletter,
-              profile_visibility: 'public',
-              language: 'ar'
-            })
-            .eq('id', data.user.id);
-
-          if (profileError) {
-            console.error('Profile update error:', profileError);
-            // Don't show this error to user as account is already created
-          }
-        } catch (profileUpdateError) {
-          console.error('Profile update failed:', profileUpdateError);
-        }
-
+      // Handle signup success
+      if (result.success) {
+        logger.info('Account created successfully', { userId: result.user?.id }, 'Signup');
+        
         // Show success message
-        if (data.user.email_confirmed_at) {
-          setSuccessMessage('تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن 🎉');
-        } else {
-          setSuccessMessage('تم إنشاء الحساب بنجاح! تحقق من بريدك الإلكتروني لتأكيد الحساب 📧');
-        }
-
-        // Clear form
+        setSuccessMessage('تم إنشاء الحساب بنجاح! 🎉');
+        
+        // Reset form
         setFormData({
           firstName: '',
           lastName: '',
@@ -355,20 +264,32 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
           acceptTerms: false,
           receiveNewsletter: true
         });
-
-        // Call success callback after delay
-        setTimeout(() => {
-          onSuccess?.(data.user);
-        }, 2000);
+        
+        // Call success callback
+        if (onSuccess && result.user) {
+          onSuccess(result.user);
+        }
+      } 
+      // Handle signup failure
+      else {
+        const errorMessage = result.error?.message || 'فشل في إنشاء الحساب';
+        logger.warn('Account creation failed', { error: errorMessage }, 'Signup');
+        
+        if (result.error?.message?.includes('already registered')) {
+          setErrors([{ field: 'email', message: 'هذا البريد الإلكتروني مسجل مسبقاً' }]);
+        } else {
+          setErrors([{ field: 'general', message: errorMessage }]);
+        }
       }
-      
     } catch (error: any) {
-      console.error('Signup error:', error);
+      // Handle unexpected errors
+      logger.error('Signup error', error, 'Signup');
       setErrors([{ field: 'general', message: 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى' }]);
     } finally {
+      // Clear loading state
       setIsSubmitting(false);
     }
-  }, [formData, validateForm, onSuccess]);
+  }, [formData, validateForm, signup, onSuccess]);
 
   /**
    * Get error message for specific field
@@ -388,10 +309,11 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
 
   /**
    * Password strength indicator component
+   * Shows visual feedback about password strength
    */
   const PasswordStrengthIndicator: React.FC = () => (
     <div className="mt-2">
-      <div className="flex space-x-1 mb-2">
+      <div className="flex space-x-1 space-x-reverse mb-2">
         {[0, 1, 2, 3, 4].map(index => (
           <div
             key={index}
@@ -771,14 +693,11 @@ const Signup: React.FC<SignupProps> = ({ onSuccess, onLoginRedirect }) => {
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                    <span className="animate-spin h-5 w-5 mr-3 rounded-full border-b-2 border-white"></span>
                     جاري إنشاء الحساب...
                   </>
                 ) : (
-                  <>
-                    <Star className="h-5 w-5 ml-2" />
-                    إنشاء حساب جديد
-                  </>
+                  'إنشاء حساب جديد'
                 )}
               </button>
             </div>

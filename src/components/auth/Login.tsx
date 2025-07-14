@@ -1,285 +1,178 @@
 /**
- * Login Component - Yalla Souq Palestinian Marketplace Authentication
+ * Login Component - Yalla Souq Palestinian Marketplace
  * 
- * Comprehensive user authentication component providing secure login functionality
- * for the Palestinian marketplace platform. This component handles email/password
- * authentication, social login options, and seamless user experience with proper
- * error handling and validation.
- * 
- * Authentication Features:
- * - Email and password login with validation
- * - Social authentication integration (Google, Facebook, etc.)
- * - Remember me functionality for persistent sessions
- * - Password visibility toggle for user convenience
- * - Forgot password flow with email recovery
- * - Account verification status handling
- * - Multi-language error messages in Arabic and English
- * 
- * Security Implementation:
- * - Supabase authentication integration
- * - Rate limiting for brute force protection
- * - Input sanitization and validation
- * - Secure token management
- * - Session persistence and management
- * - CSRF protection through Supabase
- * 
- * User Experience Features:
- * - Real-time form validation with immediate feedback
- * - Loading states during authentication process
- * - Accessibility compliance with ARIA labels
- * - Responsive design for all device sizes
- * - RTL (Right-to-Left) support for Arabic interface
- * - Smooth transitions and micro-interactions
- * 
- * Business Logic:
- * - Redirect handling for post-login navigation
- * - User role detection and appropriate routing
- * - Marketing campaign tracking through UTM parameters
- * - Analytics integration for login success/failure rates
- * - A/B testing support for optimization
- * 
- * Form Management:
- * - React Hook Form integration for performance
- * - Custom validation rules for Palestinian market
- * - Error handling with contextual messages
- * - Auto-completion support for browsers
- * - Progressive enhancement for JavaScript-disabled browsers
- * 
- * Integration Points:
- * - Supabase Auth for backend authentication
- * - NextJS routing for navigation management
- * - Custom hooks for state management
- * - Email service for password recovery
- * - Analytics services for user behavior tracking
- * 
- * @component Login
- * @returns {JSX.Element} Complete login interface with form and features
- * 
- * @author Yalla Souq Development Team
- * @version 2.1.0
- * @since 1.0.0
+ * This component handles user authentication through email and password.
+ * It provides a complete login form with validation, error handling,
+ * and integration with the useAuth hook.
  */
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/lib/logger';
 
-import React, { useState, useCallback } from 'react';
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-// NEW: Enhanced authentication with useAuth hook integration
-import { useAuth } from '../../hooks/useAuth';
-
-interface LoginFormData {
-  email: string;
-  password: string;
-  rememberMe: boolean;
-}
-
-interface LoginError {
-  field?: 'email' | 'password' | 'general';
-  message: string;
-}
-
+// Props interface for the Login component
 interface LoginProps {
   onSuccess?: (user: any) => void;
   onSignupRedirect?: () => void;
 }
 
+// Form data interface
+interface FormData {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+// Error interface for validation
+interface FormError {
+  field?: 'email' | 'password' | 'general';
+  message: string;
+}
+
 const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
-  // NEW: Professional authentication hook integration
-  // This replaces direct Supabase calls with our centralized auth management
-  const { login, isLoading: authLoading, error: authError } = useAuth();
+  // Get authentication methods from useAuth hook
+  const { login } = useAuth();
   
-  // Component state management for form handling
-  const [formData, setFormData] = useState<LoginFormData>({
+  // Form state
+  const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     rememberMe: false
   });
   
-  // UI state management for user feedback
-  const [errors, setErrors] = useState<LoginError[]>([]);
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [successMessage, setSuccessMessage] = useState<string>('');
+  // UI state
+  const [errors, setErrors] = useState<FormError[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  /**
-   * Real form validation
-   */
-  const validateForm = useCallback((): boolean => {
-    const newErrors: LoginError[] = [];
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.push({ field: 'email', message: 'البريد الإلكتروني مطلوب' });
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.push({ field: 'email', message: 'صيغة البريد الإلكتروني غير صحيحة' });
-    }
-    
-    // Password validation
-    if (!formData.password) {
-      newErrors.push({ field: 'password', message: 'كلمة المرور مطلوبة' });
-    } else if (formData.password.length < 6) {
-      newErrors.push({ field: 'password', message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
-    }
-    
-    setErrors(newErrors);
-    return newErrors.length === 0;
-  }, [formData]);
-
-  /**
-   * Handle input changes
-   */
-  const handleInputChange = useCallback((field: keyof LoginFormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear field-specific errors
-    setErrors(prev => prev.filter(error => error.field !== field));
-    setSuccessMessage('');
-  }, []);
-
-  /**
-   * Enhanced Login Handler with Mock Authentication Support
-   * 
-   * NEW: This method now checks for mock data mode to avoid Supabase calls
-   * during development, preventing 400 errors and providing smooth dev experience.
-   */
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      console.log('Form validation failed');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setErrors([]);
-    setSuccessMessage('');
-    
-    try {
-      // Check if we should use mock authentication
-      const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
-      
-      if (useMockData) {
-        // Mock authentication for development
-        const email = formData.email.trim().toLowerCase();
-        console.log('Using mock authentication for development', { email });
-        
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Simple mock authentication logic
-        const validEmails = [
-          'admin@yallasouq.ps',
-          'user@yallasouq.ps', 
-          'test@yallasouq.ps',
-          'maria-ashhab@gmail.com'
-        ];
-        
-        if (validEmails.includes(email) && formData.password.length >= 6) {
-          // Mock successful login
-          console.log('Mock login successful');
-          setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
-          
-          // Create mock user
-          const mockUser = {
-            id: 'mock-user-' + Date.now(),
-            email: email,
-            user_metadata: {
-              first_name: 'مستخدم',
-              last_name: 'تجريبي'
-            }
-          };
-          
-          // Call success callback immediately instead of using setTimeout
-          if (onSuccess) {
-            console.log('Calling onSuccess callback with mock user');
-            onSuccess(mockUser);
-          }
-          return;
-        } else {
-          // Mock authentication failed
-          setErrors([{ field: 'general', message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة (وضع تجريبي)' }]);
-          return;
-        }
-      }
-      
-      // Real authentication using useAuth hook
-      const result = await login({
-        email: formData.email,
-        password: formData.password,
-        rememberMe: formData.rememberMe,
-      });
-
-      if (result.success && result.user) {
-        console.log('Login successful via useAuth hook');
-        setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
-        
-        // Call success callback immediately instead of using setTimeout
-        if (onSuccess) {
-          console.log('Calling onSuccess callback with real user');
-          onSuccess(result.user);
-        }
-      } else {
-        const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'حدث خطأ أثناء تسجيل الدخول';
-        setErrors([{ field: 'general', message: errorMessage }]);
-      }
-
-    } catch (error: any) {
-      console.error('Login error:', error);
-      setErrors([{ field: 'general', message: 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى' }]);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [formData, login, onSuccess, validateForm]);
-
-  /**
-   * Handle forgot password
-   */
-  const handleForgotPassword = useCallback(async () => {
-    if (!formData.email) {
-      setErrors([{ field: 'email', message: 'أدخل البريد الإلكتروني أولاً' }]);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-
-      if (error) {
-        setErrors([{ field: 'general', message: error.message }]);
-      } else {
-        setSuccessMessage('تم إرسال رابط إعادة تعيين كلمة المرور لبريدك الإلكتروني');
-      }
-    } catch (error: any) {
-      setErrors([{ field: 'general', message: 'حدث خطأ أثناء إرسال البريد' }]);
-    }
-  }, [formData.email]);
-
-  /**
-   * Load saved email on component mount
-   */
-  React.useEffect(() => {
+  // Load saved email on component mount (for "remember me" feature)
+  useEffect(() => {
     const savedEmail = localStorage.getItem('yalla-souq-remember-email');
     if (savedEmail) {
       setFormData(prev => ({ ...prev, email: savedEmail, rememberMe: true }));
     }
   }, []);
 
-  /**
-   * Get error message for specific field
-   */
-  const getFieldError = useCallback((field: string): string | undefined => {
-    return errors.find(error => error.field === field)?.message;
-  }, [errors]);
+  // Handle input changes
+  const handleInputChange = (field: keyof FormData, value: string | boolean) => {
+    // Update form data
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear field-specific errors
+    setErrors(prev => prev.filter(error => error.field !== field));
+    
+    // Clear success message when user starts typing again
+    if (successMessage) {
+      setSuccessMessage('');
+    }
+  };
 
-  /**
-   * Get general error messages
-   */
-  const getGeneralErrors = useCallback((): string[] => {
+  // Validate form before submission
+  const validateForm = (): boolean => {
+    const newErrors: FormError[] = [];
+    
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.push({ field: 'email', message: 'البريد الإلكتروني مطلوب' });
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.push({ field: 'email', message: 'صيغة البريد الإلكتروني غير صحيحة' });
+      }
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.push({ field: 'password', message: 'كلمة المرور مطلوبة' });
+    }
+    
+    // Update errors state
+    setErrors(newErrors);
+    
+    // Return true if no errors
+    return newErrors.length === 0;
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Set loading state
+    setIsSubmitting(true);
+    setErrors([]);
+    
+    try {
+      // Log authentication attempt
+      logger.debug('Attempting login', { email: formData.email }, 'Login');
+      
+      // Call login method from useAuth hook
+      const result = await login({
+        email: formData.email,
+        password: formData.password,
+        rememberMe: formData.rememberMe
+      });
+      
+      // Handle successful login
+      if (result.success && result.user) {
+        logger.info('Login successful', { userId: result.user.id }, 'Login');
+        
+        // Show success message
+        setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
+        
+        // Call success callback if provided
+        if (onSuccess) {
+          onSuccess(result.user);
+        }
+      } 
+      // Handle login failure
+      else {
+        const errorMessage = result.error?.message || 'فشل تسجيل الدخول';
+        logger.warn('Login failed', { error: errorMessage }, 'Login');
+        
+        setErrors([{ field: 'general', message: errorMessage }]);
+      }
+    } catch (error: any) {
+      // Handle unexpected errors
+      logger.error('Login error', error, 'Login');
+      setErrors([{ 
+        field: 'general', 
+        message: 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى' 
+      }]);
+    } finally {
+      // Clear loading state
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = () => {
+    // Validate email
+    if (!formData.email) {
+      setErrors([{ field: 'email', message: 'أدخل البريد الإلكتروني أولاً' }]);
+      return;
+    }
+    
+    // Show success message (in a real app, this would send a reset email)
+    setSuccessMessage('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني');
+  };
+
+  // Helper to get error for a specific field
+  const getFieldError = (field: string): string | undefined => {
+    return errors.find(error => error.field === field)?.message;
+  };
+
+  // Helper to get general errors
+  const getGeneralErrors = (): string[] => {
     return errors
       .filter(error => error.field === 'general')
       .map(error => error.message);
-  }, [errors]);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -326,7 +219,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-6">
             
             {/* Email Field */}
             <div>
@@ -456,7 +349,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                    <span className="animate-spin h-5 w-5 mr-3 rounded-full border-b-2 border-white"></span>
                     جاري تسجيل الدخول...
                   </>
                 ) : (
