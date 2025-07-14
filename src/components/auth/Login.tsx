@@ -160,7 +160,8 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
       
       if (useMockData) {
         // Mock authentication for development
-        console.log('Using mock authentication for development', { email: formData.email });
+        const email = formData.email.trim().toLowerCase();
+        console.log('Using mock authentication for development', { email });
         
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -172,8 +173,6 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
           'test@yallasouq.ps',
           'maria-ashhab@gmail.com'
         ];
-        
-        const email = formData.email.trim().toLowerCase();
         
         if (validEmails.includes(email) && formData.password.length >= 6) {
           // Mock successful login
