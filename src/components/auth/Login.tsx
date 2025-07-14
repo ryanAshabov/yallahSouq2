@@ -152,11 +152,11 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
     setSuccessMessage('');
     
     try {
-      // NEW: Check if we should use mock authentication
+      // Check if we should use mock authentication
       const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
       
       if (useMockData) {
-        // NEW: Mock authentication for development
+        // Mock authentication for development
         console.log('Using mock authentication for development');
         
         // Simulate network delay
@@ -186,10 +186,10 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
             }
           };
           
-          setTimeout(() => {
-            onSuccess?.(mockUser);
-          }, 1000);
-          
+          // Call success callback immediately instead of using setTimeout
+          if (onSuccess) {
+            onSuccess(mockUser);
+          }
           return;
         } else {
           // Mock authentication failed
@@ -208,9 +208,10 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
       if (result.success && result.user) {
         setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
         
-        setTimeout(() => {
-          onSuccess?.(result.user);
-        }, 1000);
+        // Call success callback immediately instead of using setTimeout
+        if (onSuccess) {
+          onSuccess(result.user);
+        }
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'حدث خطأ أثناء تسجيل الدخول';
         setErrors([{ field: 'general', message: errorMessage }]);

@@ -38,6 +38,7 @@ export default function LoginPage() {
   // Handle successful login
   const handleLoginSuccess = async (user: any) => {
     try {
+      console.log('Login success, redirecting user', user);
       let profile;
       
       // Check if we're using mock data and this is a mock user
@@ -51,6 +52,10 @@ export default function LoginPage() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
+        
+        // Immediate redirect for mock users
+        router.push('/dashboard');
+        return;
       } else {
         // Get user profile from Supabase for real users
         const { data } = await supabase
