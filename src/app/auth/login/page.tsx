@@ -40,7 +40,7 @@ export default function LoginPage() {
   const handleLoginSuccess = async (user: any) => {
     try {
       // Get redirect URL from query params or use default
-      const redirectTo = searchParams.get('redirect') || '/dashboard';
+      let redirectTo = searchParams.get('redirect') || '/dashboard';
       console.log('Login success, redirecting user to:', redirectTo);
       
       let profile;
@@ -58,7 +58,7 @@ export default function LoginPage() {
         };
         
         // Immediate redirect for mock users
-        router.push(redirectTo);
+        window.location.href = redirectTo;
         return;
       } else {
         // Get user profile from Supabase for real users
@@ -73,18 +73,18 @@ export default function LoginPage() {
       if (profile) {
         // Redirect based on user type or preferences
         if (profile.is_business_verified) {
-          router.push(redirectTo.includes('/business') ? redirectTo : '/business/dashboard');
+          window.location.href = redirectTo.includes('/business') ? redirectTo : '/business/dashboard';
         } else {
-          router.push(redirectTo);
+          window.location.href = redirectTo;
         }
       } else {
         // New user, redirect to complete profile
-        router.push('/profile/setup');
+        window.location.href = '/profile/setup';
       }
     } catch (error) {
       console.error('Profile fetch error:', error);
       // Default redirect
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     }
   };
 
