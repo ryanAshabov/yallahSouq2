@@ -225,17 +225,52 @@ export const useAuth = () => {
 
         if (authSession?.user) {
           try {
-            // Fetch full user profile
-            const profile = await getUserProfile(authSession.user.id);
+            // Check if using mock data and user ID is a mock ID
+            const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+            const isMockUser = authSession.user.id.startsWith('mock-user-');
             
-            if (!mounted) return;
+            if (useMockData && isMockUser) {
+              // Create mock user profile directly without Supabase query
+              const mockProfile = {
+                id: authSession.user.id,
+                email: authSession.user.email || '',
+                first_name: 'مستخدم',
+                last_name: 'تجريبي',
+                phone: '+970123456789',
+                is_business_verified: false,
+                email_notifications: true,
+                sms_notifications: true,
+                marketing_emails: true,
+                profile_visibility: 'public' as const,
+                language: 'ar' as const,
+                email_verified: true,
+                phone_verified: true,
+                account_status: 'active' as const,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              } as User;
+              
+              if (!mounted) return;
+              
+              setSession({ 
+                user: mockProfile, 
+                isLoading: false, 
+                error: null, 
+                isAuthenticated: true 
+              });
+            } else {
+              // Fetch full user profile from Supabase
+              const profile = await getUserProfile(authSession.user.id);
+              
+              if (!mounted) return;
 
-            setSession({ 
-              user: profile, 
-              isLoading: false, 
-              error: null, 
-              isAuthenticated: true 
-            });
+              setSession({ 
+                user: profile, 
+                isLoading: false, 
+                error: null, 
+                isAuthenticated: true 
+              });
+            }
 
             // Track successful login
             localStorage.setItem('yalla-souq-last-login', new Date().toISOString());
@@ -288,16 +323,52 @@ export const useAuth = () => {
           case 'SIGNED_IN':
             if (authSession?.user) {
               try {
-                const profile = await getUserProfile(authSession.user.id);
+                // Check if using mock data and user ID is a mock ID
+                const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+                const isMockUser = authSession.user.id.startsWith('mock-user-');
                 
-                if (!mounted) return;
-                
-                setSession({ 
-                  user: profile, 
-                  isLoading: false, 
-                  error: null, 
-                  isAuthenticated: true 
-                });
+                if (useMockData && isMockUser) {
+                  // Create mock user profile directly without Supabase query
+                  const mockProfile = {
+                    id: authSession.user.id,
+                    email: authSession.user.email || '',
+                    first_name: 'مستخدم',
+                    last_name: 'تجريبي',
+                    phone: '+970123456789',
+                    is_business_verified: false,
+                    email_notifications: true,
+                    sms_notifications: true,
+                    marketing_emails: true,
+                    profile_visibility: 'public' as const,
+                    language: 'ar' as const,
+                    email_verified: true,
+                    phone_verified: true,
+                    account_status: 'active' as const,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  } as User;
+                  
+                  if (!mounted) return;
+                  
+                  setSession({ 
+                    user: mockProfile, 
+                    isLoading: false, 
+                    error: null, 
+                    isAuthenticated: true 
+                  });
+                } else {
+                  // Fetch full user profile from Supabase
+                  const profile = await getUserProfile(authSession.user.id);
+                  
+                  if (!mounted) return;
+                  
+                  setSession({ 
+                    user: profile, 
+                    isLoading: false, 
+                    error: null, 
+                    isAuthenticated: true 
+                  });
+                }
 
                 // Reset login attempts on successful login
                 setLoginAttempts(0);
