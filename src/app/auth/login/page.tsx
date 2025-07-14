@@ -6,12 +6,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Login from '@/components/auth/Login';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Check if user is already logged in
@@ -38,7 +39,10 @@ export default function LoginPage() {
   // Handle successful login
   const handleLoginSuccess = async (user: any) => {
     try {
-      console.log('Login success, redirecting user', user);
+      // Get redirect URL from query params or use default
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
+      console.log('Login success, redirecting user to:', redirectTo);
+      
       let profile;
       
       // Check if we're using mock data and this is a mock user
@@ -54,7 +58,7 @@ export default function LoginPage() {
         };
         
         // Immediate redirect for mock users
-        router.push('/dashboard');
+        router.push(redirectTo);
         return;
       } else {
         // Get user profile from Supabase for real users
@@ -69,9 +73,9 @@ export default function LoginPage() {
       if (profile) {
         // Redirect based on user type or preferences
         if (profile.is_business_verified) {
-          router.push('/business/dashboard');
+          router.push(redirectTo.includes('/business') ? redirectTo : '/business/dashboard');
         } else {
-          router.push('/dashboard');
+          router.push(redirectTo);
         }
       } else {
         // New user, redirect to complete profile

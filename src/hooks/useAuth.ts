@@ -561,7 +561,13 @@ export const useAuth = () => {
           // 🎉 Return success response with user data
           return {
             success: true,
-            user: mockUser
+            user: mockUser,
+            session: {
+              access_token: 'mock-token-' + Date.now(),
+              refresh_token: 'mock-refresh-' + Date.now(),
+              expires_at: Date.now() + 3600000,
+              user: mockUser
+            }
           };
         } else {
           // ❌ MOCK AUTHENTICATION FAILED

@@ -145,7 +145,10 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      console.log('Form validation failed');
+      return;
+    }
     
     setIsSubmitting(true);
     setErrors([]);
@@ -157,7 +160,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
       
       if (useMockData) {
         // Mock authentication for development
-        console.log('Using mock authentication for development');
+        console.log('Using mock authentication for development', { email: formData.email });
         
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -174,7 +177,8 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
         
         if (validEmails.includes(email) && formData.password.length >= 6) {
           // Mock successful login
-          setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉 (وضع تجريبي)');
+          console.log('Mock login successful');
+          setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
           
           // Create mock user
           const mockUser = {
@@ -188,6 +192,7 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
           
           // Call success callback immediately instead of using setTimeout
           if (onSuccess) {
+            console.log('Calling onSuccess callback with mock user');
             onSuccess(mockUser);
           }
           return;
@@ -202,14 +207,16 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onSignupRedirect }) => {
       const result = await login({
         email: formData.email,
         password: formData.password,
-        rememberMe: formData.rememberMe
+        rememberMe: formData.rememberMe,
       });
 
       if (result.success && result.user) {
+        console.log('Login successful via useAuth hook');
         setSuccessMessage('تم تسجيل الدخول بنجاح! 🎉');
         
         // Call success callback immediately instead of using setTimeout
         if (onSuccess) {
+          console.log('Calling onSuccess callback with real user');
           onSuccess(result.user);
         }
       } else {
