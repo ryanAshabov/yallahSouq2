@@ -8,7 +8,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Login from '@/components/auth/Login';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; 
+import { logger } from '@/lib/logger';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,41 +40,75 @@ export default function LoginPage() {
   // Handle successful login
   const handleLoginSuccess = async (user: any) => {
     try {
-      // Get redirect URL from query params or use default
-      let redirectTo = searchParams.get('redirect') || '/dashboard';
-      console.log('Login success, redirecting user to:', redirectTo);
+      // Get redirect URL from query params or use default (relative path only)
+      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      logger.info('Login success, redirecting to', { redirectPath }, 'LoginPage');
       
-      let profile;
+      // In WebContainer, we need to use relative paths for navigation
+      const redirectTo = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`;
       
       // Check if we're using mock data and this is a mock user
       if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' && user.id?.startsWith('mock-user-')) {
-        // Create mock profile instead of querying Supabase
-        profile = {
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || 'Mock User',
-          is_business_verified: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        // Immediate redirect for mock users
-        window.location.href = redirectTo;
-        return;
+        logger.info('Mock user detected, redirecting without profile check', null, 'LoginPage');
+        // Use router.replace for safer navigation in WebContainer
+        router.replace(redirectTo);
       } else {
-        // Get user profile from Supabase for real users
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        profile = data;
+        // For real users, get profile from Supabase
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile && profile.is_business_verified) {
+            // Business users get special routing
+            const businessRedirect = redirectTo.includes('/business') ? redirectTo : '/business/dashboard';
+            router.replace(businessRedirect);
+          } else if (profile) {
+            // Regular users with profile
+            router.replace(redirectTo);
+          } else {
+            // New user without profile
+            router.replace('/profile/setup');
+          }
+        } catch (error) {
+          logger.error('Profile fetch error', error, 'LoginPage');
+          // Default redirect on error
+          router.replace('/dashboard');
+        }
       }
+    } catch (error) {
+      logger.error('Login success handler error', error, 'LoginPage');
+      // Fallback redirect
+      router.replace('/dashboard');
+    }
+  };
 
-      if (profile) {
-        // Redirect based on user type or preferences
-        if (profile.is_business_verified) {
-          window.location.href = redirectTo.includes('/business') ? redirectTo : '/business/dashboard';
+  // Handle redirect to signup
+  const handleSignupRedirect = () => {
+    router.push('/auth/signup');
+  };
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Login 
+      onSuccess={handleLoginSuccess}
+      onSignupRedirect={handleSignupRedirect}
+    />
+  );
+}
         } else {
           window.location.href = redirectTo;
         }
