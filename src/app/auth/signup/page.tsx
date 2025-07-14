@@ -62,20 +62,28 @@ export default function SignupPage() {
   const handleSignupSuccess = (user: any) => {
     try {
       // Check if email verification is required
-      if (user.email_confirmed_at) {
+      console.log("Signup success, user:", user);
+      
+      // For mock users, always redirect to profile setup
+      const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+      if (useMockData || user.email_confirmed_at) {
         // Email is already confirmed, redirect to profile setup
-        logger.info('Signup successful, email already confirmed', { userId: user.id }, 'SignupPage');
-        router.push('/profile/setup');
+        logger.info('Signup successful, redirecting to profile setup', { userId: user.id }, 'SignupPage');
+        
+        // Use window.location for more reliable navigation in WebContainer
+        window.location.href = '/profile/setup';
       } else {
         // Email confirmation required, redirect to verification page
         logger.info('Signup successful, email verification required', { userId: user.id }, 'SignupPage');
-        router.push(`/auth/verify-email?email=${encodeURIComponent(user.email)}`);
+        
+        // Use window.location for more reliable navigation in WebContainer
+        window.location.href = `/auth/verify-email?email=${encodeURIComponent(user.email)}`;
       }
     } catch (error) {
       logger.error('Signup success handler error', error, 'SignupPage');
       
       // Default redirect to email verification
-      router.push('/auth/verify-email');
+      window.location.href = '/auth/verify-email';
     }
   };
 

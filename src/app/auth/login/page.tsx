@@ -54,17 +54,18 @@ export default function LoginPage() {
   const handleLoginSuccess = (user: any) => {
     try {
       // Get redirect URL from query params or use default
+      console.log("Login success, user:", user);
       const redirectPath = searchParams.get('redirect') || '/dashboard';
       
       logger.info('Login successful, redirecting user', { redirectPath }, 'LoginPage');
       
-      // Use router.push for navigation within the app
-      router.push(redirectPath);
+      // Use window.location for more reliable navigation in WebContainer
+      window.location.href = redirectPath;
     } catch (error) {
       logger.error('Login redirect error', error, 'LoginPage');
       
       // Fallback to dashboard on error
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     }
   };
 
